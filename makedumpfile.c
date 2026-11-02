@@ -1128,7 +1128,7 @@ error:
 	return FALSE;
 }
 
-int32_t
+static int32_t
 get_kernel_version(char *release)
 {
 	int32_t version;
