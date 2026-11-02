@@ -115,6 +115,11 @@ print_usage(void)
 	MSG("  # makedumpfile -g VMCOREINFO --xen-syms XEN-SYMS\n");
 	MSG("\n");
 	MSG("\n");
+	MSG("  Creating DUMPFILE of the running kernel with BPF:\n");
+	MSG("  # makedumpfile [-c|-l|-p|-z|-E] [-d DL] --bpf DUMPFILE\n");
+	MSG("  # makedumpfile -F [-c|-l|-p|-z|-E] [-d DL] --bpf\n");
+	MSG("\n");
+	MSG("\n");
 	MSG("  Creating DUMPFILE from multiple VMCOREs generated on sadump diskset configuration:\n");
 	MSG("  # makedumpfile [-c|-l|-p|-z] [-d DL] -x VMLINUX --diskset=VMCORE1 --diskset=VMCORE2\n");
 	MSG("    [--diskset=VMCORE3 ..] DUMPFILE\n");
@@ -322,6 +327,16 @@ print_usage(void)
 	MSG("      the 'System Ram' and 'kernel text' program segment of /proc/kcore excluding\n");
 	MSG("      the crashkernel range, then calculates the page number of different kind per\n");
 	MSG("      vmcoreinfo. So currently /proc/kcore need be specified explicitly.\n");
+	MSG("\n");
+	MSG("  [--bpf]:\n");
+	MSG("      Read the memory of the running kernel with BPF instead of reading a\n");
+	MSG("      VMCORE, so VMCORE is not specified. This is an alternative to\n");
+	MSG("      /proc/kcore. It needs root and a kernel with BPF and vmcoreinfo, and\n");
+	MSG("      is not available when the kernel is locked down. Memory that the\n");
+	MSG("      kernel has unmapped (e.g. KFENCE guard pages) is saved as zeros.\n");
+	MSG("      This option cannot be used with --split, --num-threads, --mem-usage\n");
+	MSG("      and --diskset. It is currently supported only on x86_64 and needs\n");
+	MSG("      makedumpfile to be built with USEBPF=on.\n");
 	MSG("\n");
 	MSG("  [--dry-run]:\n");
 	MSG("      Do not write the output dump file while still performing operations specified\n");

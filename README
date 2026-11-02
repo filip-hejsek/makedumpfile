@@ -71,6 +71,11 @@
     Note: the extension will only work for kernels with DEBUG_INFO_BTF
     & KALLSYMS enabled.
 
+  - Build with support for reading the running kernel with BPF (--bpf):
+    # make USEBPF=on ; make install
+    The user has to prepare libbpf, clang with the BPF target and bpftool.
+    This is supported only on x86_64.
+
   - Build the extension module for --eppic option.
     # make eppic_makedumpfile.so
     The user has to prepare eppic library from the following site:

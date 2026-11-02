@@ -45,7 +45,7 @@ CFLAGS_ARCH += -m32
 endif
 
 SRC_BASE = makedumpfile.c makedumpfile.h diskdump_mod.h sadump_mod.h sadump_info.h
-SRC_PART = print_info.c dwarf_info.c elf_info.c erase_info.c sadump_info.c cache.c tools.c printk.c detect_cycle.c kallsyms.c btf_info.c extension.c
+SRC_PART = print_info.c dwarf_info.c elf_info.c erase_info.c sadump_info.c cache.c tools.c printk.c detect_cycle.c kallsyms.c btf_info.c extension.c bpf_memory.c
 OBJ_PART=$(patsubst %.c,%.o,$(SRC_PART))
 SRC_ARCH = arch/arm.c arch/arm64.c arch/x86.c arch/x86_64.c arch/ia64.c arch/ppc64.c arch/s390x.c arch/ppc.c arch/sparc64.c arch/mips64.c arch/loongarch64.c arch/riscv64.c
 OBJ_ARCH=$(patsubst %.c,%.o,$(SRC_ARCH))
@@ -76,6 +76,17 @@ endif
 ifeq ($(EXTENSION), on)
 LIBS := -lbpf $(LIBS)
 CFLAGS += -DEXTENSION
+endif
+
+# --bpf: read the running kernel's memory with BPF (x86_64 only)
+CLANG ?= clang
+BPFTOOL ?= bpftool
+ifeq ($(USEBPF), on)
+ifneq ($(EXTENSION), on)
+LIBS := -lbpf $(LIBS)
+endif
+CFLAGS += -DUSEBPF
+BPF_SKEL = bpf_memory.skel.h
 endif
 
 ifeq ($(DEBUG), on)
@@ -113,6 +124,14 @@ all: makedumpfile
 $(OBJ_PART): $(SRC_PART)
 	$(CC) $(CFLAGS) -c -o ./$@ $(VPATH)$(@:.o=.c)
 
+bpf_memory.o: $(BPF_SKEL)
+
+bpf_memory.bpf.o: bpf_memory.bpf.c bpf_memory.h
+	$(CLANG) -g -O2 -Wall -target bpf -D__TARGET_ARCH_$(subst x86_64,x86,$(ARCH)) -c -o $@ $<
+
+bpf_memory.skel.h: bpf_memory.bpf.o
+	$(BPFTOOL) gen skeleton $< name bpf_memory_bpf > $@
+
 $(OBJ_ARCH): $(SRC_ARCH)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_ARCH) -c -o ./$@ $(VPATH)$(@:.o=.c)
@@ -131,6 +150,7 @@ eppic_makedumpfile.so: extension_eppic.c
 
 clean:
 	rm -f $(OBJ) $(OBJ_PART) $(OBJ_ARCH) makedumpfile makedumpfile.8 makedumpfile.conf.5
+	rm -f bpf_memory.bpf.o bpf_memory.skel.h
 	$(MAKE) -C extensions clean
 
 install:

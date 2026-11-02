@@ -21,6 +21,7 @@
 #include "erase_info.h"
 #include "sadump_info.h"
 #include "cache.h"
+#include "bpf_memory.h"
 #include <stddef.h>
 #include <ctype.h>
 #include <sys/time.h>
@@ -623,6 +624,11 @@ static int
 read_from_vmcore(off_t offset, void *bufptr, unsigned long size)
 {
 	const off_t failed = (off_t)-1;
+
+#ifdef BPF_MEMORY_SUPPORTED
+	if (info->flag_bpf && bpf_memory_is_data(offset))
+		return bpf_memory_read(offset, bufptr, size);
+#endif
 
 	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
 		ERRMSG("Can't seek the dump memory(%s). (offset: %llx) %s\n",
@@ -1405,6 +1411,19 @@ int
 open_dump_memory(void)
 {
 	int fd, status;
+
+	if (info->flag_bpf) {
+#ifdef BPF_MEMORY_SUPPORTED
+		if ((fd = bpf_memory_open()) < 0)
+			return FALSE;
+		info->fd_memory = fd;
+		/* The memfd only holds the ELF headers. */
+		info->flag_usemmap = MMAP_DISABLE;
+		return TRUE;
+#else
+		return FALSE;
+#endif
+	}
 
 	if ((fd = open(info->name_memory, O_RDONLY)) < 0) {
 		ERRMSG("Can't open the dump memory(%s). %s\n",
@@ -8091,11 +8110,6 @@ write_elf_load_segment(struct cache_data *cd_page, unsigned long long paddr,
 		    paddr);
 		return FALSE;
 	}
-	if (lseek(info->fd_memory, off_memory, SEEK_SET) < 0) {
-		ERRMSG("Can't seek the dump memory(%s). %s\n",
-		    info->name_memory, strerror(errno));
-		return FALSE;
-	}
 
 	buf = malloc(page_size);
 	if (!buf) {
@@ -8109,13 +8123,11 @@ write_elf_load_segment(struct cache_data *cd_page, unsigned long long paddr,
 		else
 			bufsz_write = size;
 
-		if (read(info->fd_memory, buf, bufsz_write) != bufsz_write) {
-			ERRMSG("Can't read the dump memory(%s). %s\n",
-			    info->name_memory, strerror(errno));
+		if (!read_from_vmcore(off_memory, buf, bufsz_write))
 			goto out_error;
-		}
 		filter_data_buffer((unsigned char *)buf, paddr, bufsz_write);
 		paddr += bufsz_write;
+		off_memory += bufsz_write;
 		if (!write_cache(cd_page, buf, bufsz_write))
 			goto out_error;
 
@@ -9712,6 +9724,10 @@ close_dump_memory(void)
 		ERRMSG("Can't close the dump memory(%s). %s\n",
 		    info->name_memory, strerror(errno));
 	info->fd_memory = -1;
+#ifdef BPF_MEMORY_SUPPORTED
+	if (info->flag_bpf)
+		bpf_memory_close();
+#endif
 }
 
 void
@@ -11724,7 +11740,22 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 		return FALSE;
 	}
 
-	if ((argc == optind + 2) && !info->flag_flatten
+	if (info->flag_bpf) {
+		/*
+		 * Read the memory of the running kernel with BPF.
+		 */
+		if (info->flag_split || info->num_threads
+		    || info->flag_mem_usage || info->flag_sadump_diskset) {
+			MSG("--bpf cannot be used with --split, --num-threads, --mem-usage or --diskset.\n");
+			return FALSE;
+		}
+		info->name_memory = "(bpf)";
+		if ((argc == optind + 1) && !info->flag_flatten)
+			info->name_dumpfile = argv[optind];
+		else if (!((argc == optind) && info->flag_flatten))
+			return FALSE;
+
+	} else if ((argc == optind + 2) && !info->flag_flatten
 				 && !info->flag_split
 				 && !info->flag_sadump_diskset) {
 		/*
@@ -12028,7 +12059,7 @@ static int get_page_offset(void)
 }
 
 /* Returns the physical address of start of crash notes buffer for a kernel. */
-static int get_sys_kernel_vmcoreinfo(uint64_t *addr, uint64_t *len)
+int get_sys_kernel_vmcoreinfo(uint64_t *addr, uint64_t *len)
 {
 	char line[BUFSIZE_FGETS];
 	int count;
@@ -12177,6 +12208,7 @@ static struct option longopts[] = {
 	{"dry-run", no_argument, NULL, OPT_DRY_RUN},
 	{"show-stats", no_argument, NULL, OPT_SHOW_STATS},
 	{"extension", required_argument, NULL, OPT_EXTENSION},
+	{"bpf", no_argument, NULL, OPT_BPF},
 	{0, 0, 0, 0}
 };
 
@@ -12361,6 +12393,14 @@ main(int argc, char *argv[])
 		case OPT_DRY_RUN:
 			info->flag_dry_run = TRUE;
 			break;
+		case OPT_BPF:
+#ifdef BPF_MEMORY_SUPPORTED
+			info->flag_bpf = TRUE;
+			break;
+#else
+			MSG("--bpf is not supported by this build of makedumpfile.\n");
+			goto out;
+#endif
 		case OPT_SHOW_STATS:
 			flag_show_stats = TRUE;
 			break;

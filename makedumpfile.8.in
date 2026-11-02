@@ -22,6 +22,8 @@ makedumpfile \- make a small dumpfile of kdump
 .br
 \fBmakedumpfile\fR \-\-dump-dmesg [\-\-partial-dmesg] [\-x \fIVMLINUX\fR|\-i \fIVMCOREINFO\fR] \fIVMCORE\fR \fILOGFILE\fR
 .br
+\fBmakedumpfile\fR    [\fIOPTION\fR] \-\-bpf \fIDUMPFILE\fR
+.br
 \fBmakedumpfile\fR    [\fIOPTION\fR] \-x \fIVMLINUX\fR \-\-diskset=\fIVMCORE1\fR \-\-diskset=\fIVMCORE2\fR [\-\-diskset=\fIVMCORE3\fR ..] \fIDUMPFILE\fR
 .br
 .B makedumpfile
@@ -652,6 +654,25 @@ Show the version of makedumpfile.
 \fB\-\-check-params\fR
 Only check whether the command-line parameters are valid or not, and exit.
 Preferable to be given as the first parameter.
+
+.TP
+\fB\-\-bpf\fR
+Read the memory of the running kernel with BPF instead of reading a
+\fIVMCORE\fR, so \fIVMCORE\fR is not specified.
+This is an alternative to /proc/kcore.
+It needs root and a kernel with BPF and vmcoreinfo, and is not available
+when the kernel is locked down.
+Memory that the kernel has unmapped (e.g. KFENCE guard pages) is saved as zeros.
+This option cannot be used with the --split, --num-threads, --mem-usage and
+--diskset options.
+It is currently supported only on x86_64 and needs makedumpfile to be built
+with USEBPF=on.
+
+.br
+.B Example:
+.br
+# makedumpfile \-c \-d 31 \-\-bpf dumpfile
+.br
 
 .TP
 \fB\-\-dry-run\fR

@@ -80,3 +80,4 @@ GTAGS
 makedumpfile
 makedumpfile.8
 makedumpfile.conf.5
+bpf_memory.skel.h

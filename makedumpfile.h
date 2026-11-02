@@ -1572,6 +1572,7 @@ struct DumpInfo {
 	int		flag_excludevm;      /* -e - excluding unused vmemmap pages */
 	int		flag_use_count;      /* _refcount is named _count in struct page */
 	int		flag_dry_run;        /* do not create a vmcore file */
+	int		flag_bpf;            /* read the running kernel with BPF */
 	unsigned long	vaddr_for_vtop;      /* virtual address for debugging */
 	long		page_size;           /* size of page */
 	long		page_shift;
@@ -2826,6 +2827,7 @@ struct elf_prstatus {
 #define OPT_DRY_RUN             OPT_START+19
 #define OPT_SHOW_STATS          OPT_START+20
 #define OPT_EXTENSION           OPT_START+21
+#define OPT_BPF                 OPT_START+22
 
 /*
  * Function Prototype.
@@ -2842,6 +2844,7 @@ int initialize_zlib(z_stream *stream, int level);
 int finalize_zlib(z_stream *stream);
 
 int parse_line(char *str, char *argv[]);
+int get_sys_kernel_vmcoreinfo(uint64_t *addr, uint64_t *len);
 char *shift_string_left(char *s, int cnt);
 char *clean_line(char *line);
 char *strip_linefeeds(char *line);
